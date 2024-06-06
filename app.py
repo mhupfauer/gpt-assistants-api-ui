@@ -23,11 +23,11 @@ def str_to_bool(str_input):
 # Load environment variables
 azure_openai_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
 azure_openai_key = os.environ.get("AZURE_OPENAI_KEY")
-openai_api_key = os.environ.get("OPENAI_API_KEY")
-authentication_required = str_to_bool(os.environ.get("AUTHENTICATION_REQUIRED", False))
-assistant_id = os.environ.get("ASSISTANT_ID")
+openai_api_key = os.environ.get("OPENAI_KEY")
+authentication_required = True
+assistant_id = "asst_UlAX5KCikGWAfBUrPHdA6r0D"
 instructions = os.environ.get("RUN_INSTRUCTIONS", "")
-assistant_title = os.environ.get("ASSISTANT_TITLE", "Assistants API UI")
+assistant_title = os.environ.get("ASSISTANT_TITLE", "Research Assistant")
 enabled_file_upload_message = os.environ.get(
     "ENABLED_FILE_UPLOAD_MESSAGE", "Upload a file"
 )
@@ -93,7 +93,7 @@ class EventHandler(AssistantEventHandler):
 
     @override
     def on_tool_call_delta(self, delta, snapshot):
-        if st.session_state.current_tool_input_markdown is None:
+        if 'current_tool_input_markdown' not in st.session_state:
             with st.chat_message("Assistant"):
                 st.session_state.current_tool_input_markdown = st.empty()
 
