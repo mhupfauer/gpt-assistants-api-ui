@@ -1,6 +1,9 @@
 from openai import OpenAI
 import nltk
 from nltk.tokenize import sent_tokenize
+from pydub import AudioSegment
+import os
+import pymupdf4llm
 
 # Ensure that the required Punkt tokenizer resource is available
 nltk.download('punkt')
@@ -37,14 +40,48 @@ def chunk_text(text, max_chunk_size=4000):
     return chunks
 
 # Example usage
-chunks = chunk_text(courseText)
-for i, chunk in enumerate(chunks):
-    print(f"Chunk {i+1}: {chunk}")
-    
-    response = client.audio.speech.create(
-        model="tts-1",
-        voice="alloy",
-        input=chunk
-    )
+# chunks = chunk_text("SOME_TEXT")
+# for i, chunk in enumerate(chunks):
+#     print(f"Chunk {i+1}: {chunk}")
+#     
+#     response = client.audio.speech.create(
+#         model="tts-1",
+#         voice="alloy",
+#         input=chunk
+#     )
+#     response.stream_to_file(f"speech{i+1}.mp3")
 
-    response.stream_to_file(f"speech{i+1}.mp3")
+
+def merge_mp3_files(folder_path, output_filename):
+    # Define a one second of silence audio segment
+    one_second_silence = AudioSegment.silent(duration=1000)  # Duration is in milliseconds
+
+    # Initialize an empty audio segment for merging
+    combined = AudioSegment.empty()
+
+    # List all mp3 files in the specified directory
+    mp3_files = [file for file in os.listdir(folder_path) if file.endswith('.mp3')]
+    mp3_files.sort()  # Sorting to maintain a consistent order
+
+    # Loop over each file and concatenate them with one second of silence in between
+    for file in mp3_files:
+        current_track = AudioSegment.from_mp3(os.path.join(folder_path, file))
+        combined += current_track + one_second_silence
+
+    # Removing the extra second of silence at the end of the last track
+    combined = combined[:-1000]
+
+    # Export the combined audio to a new file
+    combined.export(os.path.join(folder_path, output_filename), format="mp3")
+
+# Usage
+# folder_path = "../data/mp3"
+# output_filename = "merged_output.mp3"
+# merge_mp3_files(folder_path, output_filename)
+
+
+def getPdfConts(path):
+    return pymupdf4llm.to_markdown("input.pdf")
+
+# Usage
+# getPdfConts("./somefile.pdf")
