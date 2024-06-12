@@ -2,7 +2,7 @@ import os
 import base64
 import re
 import json
-
+import requests
 import streamlit as st
 import openai
 from openai import AssistantEventHandler
@@ -21,13 +21,14 @@ def str_to_bool(str_input):
 
 
 # Load environment variables
+lakera_guard_api_key = os.environ.get("LAKERA_API_KEY")
 azure_openai_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
 azure_openai_key = os.environ.get("AZURE_OPENAI_KEY")
-openai_api_key = os.environ.get("OPENAI_API_KEY")
-authentication_required = str_to_bool(os.environ.get("AUTHENTICATION_REQUIRED", False))
-assistant_id = os.environ.get("ASSISTANT_ID")
+openai_api_key = os.environ.get("OPENAI_KEY")
+authentication_required = True
+assistant_id = "asst_UlAX5KCikGWAfBUrPHdA6r0D"
 instructions = os.environ.get("RUN_INSTRUCTIONS", "")
-assistant_title = os.environ.get("ASSISTANT_TITLE", "Assistants API UI")
+assistant_title = os.environ.get("ASSISTANT_TITLE", "Research Assistant")
 enabled_file_upload_message = os.environ.get(
     "ENABLED_FILE_UPLOAD_MESSAGE", "Upload a file"
 )
@@ -93,7 +94,7 @@ class EventHandler(AssistantEventHandler):
 
     @override
     def on_tool_call_delta(self, delta, snapshot):
-        if st.session_state.current_tool_input_markdown is None:
+        if 'current_tool_input_markdown' not in st.session_state:
             with st.chat_message("Assistant"):
                 st.session_state.current_tool_input_markdown = st.empty()
 
@@ -172,6 +173,15 @@ def create_thread(content, file):
     thread = client.beta.threads.create()
     return thread
 
+def securePrompt(input: str):
+    session = requests.Session()  # Allows persistent connection
+    response = session.post(
+        "https://api.lakera.ai/v1/prompt_injection",
+        json={"input": input},
+        headers={"Authorization": f"Bearer {lakera_guard_api_key}"},
+    )
+    return not response.json()['results'][0]['flagged']
+
 
 def create_message(thread, content, file):
     attachments = []
@@ -182,6 +192,7 @@ def create_message(thread, content, file):
     client.beta.threads.messages.create(
         thread_id=thread.id, role="user", content=content, attachments=attachments
     )
+    
 
 
 def create_file_link(file_name, file_id):
@@ -216,14 +227,16 @@ def format_annotation(text):
 def run_stream(user_input, file):
     if "thread" not in st.session_state:
         st.session_state.thread = create_thread(user_input, file)
-    create_message(st.session_state.thread, user_input, file)
-    with client.beta.threads.runs.stream(
-        thread_id=st.session_state.thread.id,
-        assistant_id=assistant_id,
-        event_handler=EventHandler(),
-    ) as stream:
-        stream.until_done()
-
+    if securePrompt(user_input):
+        create_message(st.session_state.thread, user_input, file)
+        with client.beta.threads.runs.stream(
+            thread_id=st.session_state.thread.id,
+            assistant_id=assistant_id,
+            event_handler=EventHandler(),
+        ) as stream:
+            stream.until_done()
+    else:
+        raise Exception("Malicious prompt detected - Please reload the application and behave yourself")
 
 def handle_uploaded_file(uploaded_file):
     file = client.files.create(file=uploaded_file, purpose="assistants")
